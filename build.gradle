@@ -1,0 +1,77 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '2.1.20'
+    id 'application'
+    //id 'com.palantir.docker' version '0.35.0'
+}
+
+group = 'ashwini.dev'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'io.ktor:ktor-server-core:2.3.9'
+    implementation 'io.ktor:ktor-server-netty:2.3.9'
+    implementation 'ch.qos.logback:logback-classic:1.4.14'
+    implementation 'io.ktor:ktor-server-metrics:2.3.9'
+    implementation 'io.ktor:ktor-server-call-logging:2.3.9'
+    implementation 'io.ktor:ktor-server-status-pages:2.3.9'
+
+    testImplementation 'org.jetbrains.kotlin:kotlin-test'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test-junit5'
+    testImplementation 'io.ktor:ktor-server-test-host:2.3.9'
+}
+
+application {
+    mainClass.set('ashwini.dev.MainKt')
+}
+
+// Create a fat JAR with all dependencies
+tasks.jar {
+    manifest {
+        attributes["Main-Class"] = application.mainClass
+    }
+    
+    // Include all runtime dependencies in the JAR
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+
+def dockerHubUsername = 'ashwinimd'
+def imageName = "${dockerHubUsername}/hello-world-api-on-k8s"
+def imageVersion = project.version
+
+tasks.register('buildDockerImage') {
+    group = 'docker'
+    description = 'Builds Docker image'
+    dependsOn tasks.jar
+
+    doLast {
+        exec {
+            workingDir projectDir
+            commandLine 'docker', 'build', '-t', "${imageName}:${imageVersion}", '-t', "${imageName}:latest", '.'
+        }
+    }
+}
+
+test {
+    useJUnitPlatform()
+    
+    testLogging {
+        events "passed", "skipped", "failed"
+        showStandardStreams = true
+        showExceptions = true
+        showStackTraces = true
+        exceptionFormat = "full"
+    }
+}
+
+kotlin {
+    jvmToolchain(23)
+}
